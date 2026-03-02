@@ -1,0 +1,9 @@
+{
+	"name": "KarshCovidPred",
+	"location": "southindia",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "1acf03a3-bc2c-4061-b337-69cd94bb76b2",
+		"tenantId": "2cba7ea3-ebf9-44ea-9658-809b43b7ec93"
+	}
+}
