@@ -14,6 +14,9 @@
 		"ls_adl_covidreportinsaa_properties_typeProperties_url": {
 			"value": "https://covidreportinsaa.dfs.core.windows.net/"
 		},
+		"tr_ingest_population_data_properties_typeProperties_scope": {
+			"value": "/subscriptions/63d0c01d-0b02-4017-b677-64a88283e1b3/resourceGroups/training/providers/Microsoft.Storage/storageAccounts/covidstoragesaa"
+		},
 		"containerUri": {
 			"value": ""
 		},
