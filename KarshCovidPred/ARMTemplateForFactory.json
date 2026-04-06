@@ -17,19 +17,11 @@
 		},
 		"Ls_http_opendata_ecdc_europa_eu_properties_typeProperties_url": {
 			"type": "string",
-			"defaultValue": "https://raw.githubusercontent.com/"
+			"defaultValue": "@{linkedService().SourcebaseUrl}"
 		},
 		"ls_adl_covidreportinsaa_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://covidreportinsaa.dfs.core.windows.net/"
-		},
-		"tr_ingest_hospital_admissions_data_properties_pl_ecdc_ingest_data_parameters_sourceRelativeUrl": {
-			"type": "string",
-			"defaultValue": "cloudboxacademy/covid19/main/ecdc_data/hospital_admissions.csv"
-		},
-		"tr_ingest_hospital_admissions_data_properties_pl_ecdc_ingest_data_parameters_SincFileName": {
-			"type": "string",
-			"defaultValue": "hospital_admissions.csv"
 		},
 		"tr_ingest_population_data_properties_typeProperties_scope": {
 			"type": "string",
@@ -247,14 +239,61 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/pl_caseDeath')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "df_casedeath_transformation",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "df_transformation_CasesDeaths",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"CasesDeathSource": {},
+									"CountryLookup": {},
+									"CasesDeathsSink": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/df_transformation_CasesDeaths')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/pl_ecdc_ingest_data')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"activities": [
 					{
-						"name": "copy ecdc data",
-						"type": "Copy",
+						"name": "Lookup ecdc",
+						"type": "Lookup",
 						"dependsOn": [],
 						"policy": {
 							"timeout": "0.12:00:00",
@@ -266,78 +305,190 @@
 						"userProperties": [],
 						"typeProperties": {
 							"source": {
-								"type": "DelimitedTextSource",
+								"type": "JsonSource",
 								"storeSettings": {
-									"type": "HttpReadSettings",
-									"requestMethod": "GET"
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
 								},
 								"formatSettings": {
-									"type": "DelimitedTextReadSettings"
+									"type": "JsonReadSettings"
 								}
 							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobFSWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "ds_ecdc_raw_csv_http",
+							"dataset": {
+								"referenceName": "ds_ecdc_filelist",
 								"type": "DatasetReference",
-								"parameters": {
-									"relative_url": {
-										"value": "@pipeline().parameters.sourceRelativeUrl",
-										"type": "Expression"
-									}
-								}
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Copy every file or command",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Lookup ecdc",
+								"dependencyConditions": [
+									"Succeeded"
+								]
 							}
 						],
-						"outputs": [
-							{
-								"referenceName": "ds_ecdc_raw_csv_dl",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": {
-										"value": "@pipeline().parameters.SincFileName",
-										"type": "Expression"
-									}
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Lookup ecdc').output.value",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "copy ecdc data",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "HttpReadSettings",
+												"requestMethod": "GET"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "ds_ecdc_raw_csv_http",
+											"type": "DatasetReference",
+											"parameters": {
+												"relative_url": {
+													"value": "@item().sourceRelativeURL",
+													"type": "Expression"
+												},
+												"baseUrl": {
+													"value": "@item().SourceBaseUrl",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "ds_ecdc_raw_csv_dl",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileName": {
+													"value": "@item().SincFileName",
+													"type": "Expression"
+												}
+											}
+										}
+									]
 								}
-							}
-						]
+							]
+						}
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
 				},
-				"parameters": {
-					"sourceRelativeUrl": {
-						"type": "string"
-					},
-					"SincFileName": {
-						"type": "string"
-					}
-				},
 				"annotations": []
 			},
 			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_ecdc_filelist')]",
 				"[concat(variables('factoryId'), '/datasets/ds_ecdc_raw_csv_http')]",
 				"[concat(variables('factoryId'), '/datasets/ds_ecdc_raw_csv_dl')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_Country_Lookup')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adl_covidreportinsaa",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "country_lookup.csv",
+						"fileSystem": "lookup"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adl_covidreportinsaa')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_ecdc_filelist')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_ablob_covidstoragesaa",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": "githubusercontent_ecdc_file_list.json",
+						"container": "config"
+					}
+				},
+				"schema": {
+					"type": "object",
+					"properties": {
+						"sourceRelativeURL": {
+							"type": "string"
+						},
+						"sinkFileName": {
+							"type": "string"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_ablob_covidstoragesaa')]"
 			]
 		},
 		{
@@ -384,10 +535,19 @@
 			"properties": {
 				"linkedServiceName": {
 					"referenceName": "Ls_http_opendata_ecdc_europa_eu",
-					"type": "LinkedServiceReference"
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"SourcebaseUrl": {
+							"value": "@dataset().baseUrl",
+							"type": "Expression"
+						}
+					}
 				},
 				"parameters": {
 					"relative_url": {
+						"type": "string"
+					},
+					"baseUrl": {
 						"type": "string"
 					}
 				},
@@ -472,10 +632,109 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/ds_processed_cases_deaths')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adl_covidreportinsaa",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": "ecdc/cases_deaths",
+						"fileSystem": "processed"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adl_covidreportinsaa')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_raw_casesDeaths')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adl_covidreportinsaa",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "cases_deaths.csv",
+						"folderPath": "ecdc",
+						"fileSystem": "raw"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": [
+					{
+						"name": "country",
+						"type": "String"
+					},
+					{
+						"name": "country_code",
+						"type": "String"
+					},
+					{
+						"name": "continent",
+						"type": "String"
+					},
+					{
+						"name": "population",
+						"type": "String"
+					},
+					{
+						"name": "indicator",
+						"type": "String"
+					},
+					{
+						"name": "daily_count",
+						"type": "String"
+					},
+					{
+						"name": "date",
+						"type": "String"
+					},
+					{
+						"name": "rate_14_day",
+						"type": "String"
+					},
+					{
+						"name": "source",
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adl_covidreportinsaa')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/Ls_http_opendata_ecdc_europa_eu')]",
 			"type": "Microsoft.DataFactory/factories/linkedServices",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"parameters": {
+					"SourcebaseUrl": {
+						"type": "string"
+					}
+				},
 				"annotations": [],
 				"type": "HttpServer",
 				"typeProperties": {
@@ -517,40 +776,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/tr_ingest_hospital_admissions_data')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "pl_ecdc_ingest_data",
-							"type": "PipelineReference"
-						},
-						"parameters": {
-							"sourceRelativeUrl": "[parameters('tr_ingest_hospital_admissions_data_properties_pl_ecdc_ingest_data_parameters_sourceRelativeUrl')]",
-							"SincFileName": "[parameters('tr_ingest_hospital_admissions_data_properties_pl_ecdc_ingest_data_parameters_SincFileName')]"
-						}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Day",
-						"interval": 1,
-						"startTime": "2026-03-17T16:46:00",
-						"timeZone": "India Standard Time",
-						"schedule": {}
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/pl_ecdc_ingest_data')]"
-			]
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/tr_ingest_population_data')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
@@ -578,6 +803,155 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/Pl_ingest_population_data')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/triggerTOExecuteCopy')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Stopped",
+				"pipelines": [],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Minute",
+						"interval": 15,
+						"startTime": "2026-03-24T17:00:00",
+						"timeZone": "India Standard Time"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/df_transformation_CasesDeaths')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "ds_raw_casesDeaths",
+								"type": "DatasetReference"
+							},
+							"name": "CasesDeathSource"
+						},
+						{
+							"dataset": {
+								"referenceName": "ds_Country_Lookup",
+								"type": "DatasetReference"
+							},
+							"name": "CountryLookup"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "ds_processed_cases_deaths",
+								"type": "DatasetReference"
+							},
+							"name": "CasesDeathsSink"
+						}
+					],
+					"transformations": [
+						{
+							"name": "filterEuOnly"
+						},
+						{
+							"name": "select1"
+						},
+						{
+							"name": "pivotCount"
+						},
+						{
+							"name": "lookupCountry"
+						},
+						{
+							"name": "select2"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          country as string,",
+						"          country_code as string,",
+						"          continent as string,",
+						"          population as integer,",
+						"          indicator as string,",
+						"          daily_count as integer,",
+						"          date as date 'dd/MM/yyyy',",
+						"          rate_14_day as double,",
+						"          source as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> CasesDeathSource",
+						"source(output(",
+						"          country as string,",
+						"          country_code_2_digit as string,",
+						"          country_code_3_digit as string,",
+						"          continent as string,",
+						"          population as integer",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> CountryLookup",
+						"CasesDeathSource filter(continent == 'Europe'  && not(isNull(country_code))) ~> filterEuOnly",
+						"filterEuOnly select(mapColumn(",
+						"          country,",
+						"          country_code,",
+						"          population,",
+						"          indicator,",
+						"          daily_count,",
+						"          source,",
+						"          each(match(name=='date'),",
+						"               'reported_date' = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> select1",
+						"select1 pivot(groupBy(country,",
+						"          country_code,",
+						"          population,",
+						"          source,",
+						"          reported_date),",
+						"     pivotBy(indicator, ['confirmed cases', 'deaths', null]),",
+						"     count = sum(daily_count),",
+						"     columnNaming: '$V_$N',",
+						"     lateral: true) ~> pivotCount",
+						"pivotCount, CountryLookup lookup(pivotCount@country == CountryLookup@country,",
+						"     multiple: false,",
+						"     pickup: 'any',",
+						"     broadcast: 'auto')~> lookupCountry",
+						"lookupCountry select(mapColumn(",
+						"          country = pivotCount@country,",
+						"          country_code_2_digit,",
+						"          country_code_3_digit,",
+						"          population = pivotCount@population,",
+						"          cases_count = {confirmed cases_count},",
+						"          deaths_count,",
+						"          reported_date,",
+						"          source",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> select2",
+						"select2 sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     truncate: true,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> CasesDeathsSink"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_raw_casesDeaths')]",
+				"[concat(variables('factoryId'), '/datasets/ds_Country_Lookup')]",
+				"[concat(variables('factoryId'), '/datasets/ds_processed_cases_deaths')]"
 			]
 		}
 	]
