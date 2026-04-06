@@ -78,7 +78,7 @@
 				"          indicator,",
 				"          daily_count,",
 				"          source,",
-				"          each(match(name == 'date'),",
+				"          each(match(name=='date'),",
 				"               'reported_date' = $$)",
 				"     ),",
 				"     skipDuplicateMapInputs: false,",
@@ -110,12 +110,15 @@
 				"     skipDuplicateMapOutputs: true) ~> select2",
 				"select2 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
+				"     partitionFileNames:['cases_deaths.csv'],",
 				"     truncate: true,",
 				"     umask: 0022,",
 				"     preCommands: [],",
 				"     postCommands: [],",
 				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true) ~> CasesDeathsSink"
+				"     skipDuplicateMapOutputs: true,",
+				"     saveOrder: 1,",
+				"     partitionBy('hash', 1)) ~> CasesDeathsSink"
 			]
 		}
 	}
