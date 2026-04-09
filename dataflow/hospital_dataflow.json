@@ -159,6 +159,7 @@
 				"          reported_date,",
 				"          source),",
 				"     pivotBy(indicator, ['Daily ICU occupancy', 'Daily hospital occupancy']),",
+				"     Count = sum(value),",
 				"     columnNaming: '$N$V',",
 				"     lateral: true) ~> pivot2",
 				"pivot1 sort(desc(reported_year_week, true),",
