@@ -1,0 +1,23 @@
+{
+	"name": "DailyHospitalOccupancy",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_adl_covidreportinsaa",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": "ecdc/DailyHospitalOccupancy",
+				"fileSystem": "processed"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}

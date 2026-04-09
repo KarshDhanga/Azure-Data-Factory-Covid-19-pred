@@ -1,0 +1,23 @@
+{
+	"name": "WeeklyHospitalSink",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_adl_covidreportinsaa",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": "ecdc/WeeklyhospitalOccupancy",
+				"fileSystem": "processed"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}
